@@ -2,6 +2,8 @@ name: Build macOS app
 on:
   push:
   workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   build:
     runs-on: macos-15
@@ -27,3 +29,10 @@ jobs:
         with:
           name: LidAngleSensor-app
           path: LidAngleSensor.zip
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest LidAngleSensor.zip --title "LidAngleSensor (Custom Sound)" \
+            --notes "Entpacken, LidAngleSensor.app in Programme ziehen. Beim ersten Start: Systemeinstellungen > Datenschutz & Sicherheit > Trotzdem öffnen."
