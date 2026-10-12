@@ -1,0 +1,29 @@
+name: Build macOS app
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select newest Xcode
+        run: |
+          XC=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          sudo xcode-select -s "$XC"
+          xcodebuild -version
+      - name: Build (ad-hoc signed, no developer account)
+        run: |
+          xcodebuild -project LidAngleSensor.xcodeproj -target LidAngleSensor \
+            -configuration Release SYMROOT="$PWD/build" ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= \
+            OTHER_CODE_SIGN_FLAGS="--timestamp=none" build
+      - name: Package
+        run: |
+          APP=build/Release/LidAngleSensor.app
+          codesign -dv --entitlements - "$APP" || true
+          ditto -c -k --keepParent "$APP" LidAngleSensor.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LidAngleSensor-app
+          path: LidAngleSensor.zip
