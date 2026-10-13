@@ -11,14 +11,17 @@ import SwiftUI
 struct LidAngleSensorApp: App {
     @State private var sensor = LidAngleSensor()
     @State private var audioController = AudioController()
+    @State private var closeEffect = LidCloseEffect()
     
     var body: some Scene {
         Window("Lid Angle Sensor", id: "main") {
             ContentView()
                 .environment(\.lidAngleSensor, sensor)
                 .environment(\.audioController, audioController)
+                .environment(\.lidCloseEffect, closeEffect)
                 .onAppear {
                     NSWindow.allowsAutomaticWindowTabbing = false
+                    closeEffect.attach(to: sensor)
                 }
         }
         .windowResizability(.contentSize)
@@ -34,6 +37,7 @@ struct LidAngleSensorApp: App {
             MenuBarView()
                 .environment(\.lidAngleSensor, sensor)
                 .environment(\.audioController, audioController)
+                .environment(\.lidCloseEffect, closeEffect)
         } label: {
             Image(systemName: "angle")
             

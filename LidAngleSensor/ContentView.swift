@@ -5,11 +5,14 @@
 //  Created by Sam on 2026-03-22.
 //
 
+import AppKit
+import Combine
 import SwiftUI
 
 struct ContentView: View {
     @Environment(\.lidAngleSensor) private var sensor
     @Environment(\.audioController) private var audioController
+    @Environment(\.lidCloseEffect) private var closeEffect
 
     @State private var inspectorShown = true
 
@@ -122,6 +125,8 @@ struct ContentView: View {
                             audioController.activeEngine.resetToDefaults()
                         }
                     }
+
+                    CloseEffectSection()
                 }
                 .inspectorColumnWidth(min: 220, ideal: 260, max: 340)
                 .disabled(!sensor.isAvailable)
@@ -149,6 +154,52 @@ private struct CreakParameterSections: View {
         Section("Ramping") {
             ParameterSlider(label: "Gain", value: $engine.gainRampMs, range: 10...500, unit: "ms", fractionDigits: 0)
             ParameterSlider(label: "Rate", value: $engine.rateRampMs, range: 10...500, unit: "ms", fractionDigits: 0)
+        }
+    }
+}
+
+// MARK: - Lid close animation
+
+private struct CloseEffectSection: View {
+    @Environment(\.lidCloseEffect) private var closeEffect
+
+    var body: some View {
+        @Bindable var effect = closeEffect
+
+        Section("Close Animation") {
+            Toggle("Animate when closing the lid", isOn: $effect.isEnabled)
+
+            if !closeEffect.hasScreenPermission {
+                Text("Needs Screen Recording permission to take a snapshot of the screen. The snapshot stays in memory and is never saved.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Button("Grant Screen Recording…") {
+                    closeEffect.requestPermission()
+                }
+            }
+
+            ParameterSlider(label: "Tilt", value: $effect.tiltStrength, range: 0.2...1.0, unit: "×", fractionDigits: 2)
+            ParameterSlider(label: "Blur", value: $effect.blurAmount, range: 0...40, unit: "pt", fractionDigits: 0)
+            ParameterSlider(label: "Darken", value: $effect.dimAmount, range: 0...1, fractionDigits: 2)
+
+            HStack {
+                Button("Preview") {
+                    closeEffect.preview()
+                }
+                Spacer()
+                Button("Defaults") {
+                    closeEffect.resetToDefaults()
+                }
+            }
+
+            if let error = closeEffect.lastError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            closeEffect.refreshPermission()
         }
     }
 }

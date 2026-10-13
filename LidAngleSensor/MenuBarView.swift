@@ -10,9 +10,11 @@ import SwiftUI
 struct MenuBarView: View {
     @Environment(\.lidAngleSensor) private var sensor
     @Environment(\.audioController) private var audioController
+    @Environment(\.lidCloseEffect) private var closeEffect
     
     var body: some View {
         @Bindable var controller = audioController
+        @Bindable var effect = closeEffect
         
         if !sensor.isAvailable {
             Text("Sensor Not Available")
@@ -39,6 +41,13 @@ struct MenuBarView: View {
         }
         .disabled(!sensor.isAvailable)
         
+        Section {
+            Toggle("Close Animation", isOn: $effect.isEnabled)
+            Button("Preview Close Animation") {
+                closeEffect.preview()
+            }
+        }
+
         Button("Quit") {
             NSApplication.shared.terminate(nil)
         }
