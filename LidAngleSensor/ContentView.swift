@@ -178,6 +178,20 @@ private struct CloseEffectSection: View {
                 }
             }
 
+            LabeledContent {
+                Slider(value: $effect.direction, in: -1...1) {
+                    EmptyView()
+                } minimumValueLabel: {
+                    Image(systemName: "arrow.down.left")
+                } maximumValueLabel: {
+                    Image(systemName: "arrow.down.right")
+                }
+            } label: {
+                Text("Direction")
+                Text(directionLabel(closeEffect.direction))
+            }
+            .onTapGesture(count: 2) { closeEffect.direction = 0 }
+
             ParameterSlider(label: "Tilt", value: $effect.tiltStrength, range: 0.2...1.0, unit: "×", fractionDigits: 2)
             ParameterSlider(label: "Blur", value: $effect.blurAmount, range: 0...40, unit: "pt", fractionDigits: 0)
             ParameterSlider(label: "Darken", value: $effect.dimAmount, range: 0...1, fractionDigits: 2)
@@ -201,6 +215,13 @@ private struct CloseEffectSection: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             closeEffect.refreshPermission()
         }
+    }
+
+    private func directionLabel(_ d: Double) -> String {
+        let percent = Int((abs(d) * 100).rounded())
+        if percent < 5 { return "Straight back" }
+        if percent > 95 { return d < 0 ? "Left" : "Right" }
+        return d < 0 ? "Left \(percent)%" : "Right \(percent)%"
     }
 }
 

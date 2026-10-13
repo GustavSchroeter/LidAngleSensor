@@ -36,6 +36,11 @@ final class LidCloseEffect {
         didSet { UserDefaults.standard.set(tiltStrength, forKey: Keys.tilt) }
     }
 
+    /// Fall direction: -1 = topples to the left, 0 = falls straight back, +1 = topples to the right.
+    var direction: Double {
+        didSet { UserDefaults.standard.set(direction, forKey: Keys.direction) }
+    }
+
     /// Maximum blur radius (points) reached while closing.
     var blurAmount: Double {
         didSet { UserDefaults.standard.set(blurAmount, forKey: Keys.blur) }
@@ -59,6 +64,7 @@ final class LidCloseEffect {
         static let tilt = "closeEffect.tilt"
         static let blur = "closeEffect.blur"
         static let dim = "closeEffect.dim"
+        static let direction = "closeEffect.direction"
     }
 
     private enum Phase { case idle, capturing, showing, fading }
@@ -97,6 +103,7 @@ final class LidCloseEffect {
         tiltStrength = d.object(forKey: Keys.tilt) as? Double ?? 0.7
         blurAmount = d.object(forKey: Keys.blur) as? Double ?? 14
         dimAmount = d.object(forKey: Keys.dim) as? Double ?? 0.5
+        direction = d.object(forKey: Keys.direction) as? Double ?? 0
     }
 
     /// Connects the effect to the sensor. Call once the real sensor exists.
@@ -116,6 +123,7 @@ final class LidCloseEffect {
 
     func resetToDefaults() {
         tiltStrength = 0.7
+        direction = 0
         blurAmount = 14
         dimAmount = 0.5
     }
@@ -231,7 +239,7 @@ final class LidCloseEffect {
         case .showing:
             let target = max(0, startAngle - angle)
             shownDelta = shownDelta.ramped(toward: target, dt: dt, tauMs: 35)
-            overlay?.apply(delta: shownDelta, tilt: tiltStrength, blur: blurAmount, dim: dimAmount)
+            overlay?.apply(delta: shownDelta, tilt: tiltStrength, direction: direction, blur: blurAmount, dim: dimAmount)
 
             if previewStart == nil {
                 let reopened = angle >= startAngle - 1
@@ -275,7 +283,7 @@ final class LidCloseEffect {
             overlay = window
             shownDelta = 0
             window.present(image: result.image, on: result.screen)
-            window.apply(delta: 0, tilt: tiltStrength, blur: blurAmount, dim: dimAmount)
+            window.apply(delta: 0, tilt: tiltStrength, direction: direction, blur: blurAmount, dim: dimAmount)
             phase = .showing
             isShowing = true
             if isPreview {
@@ -407,14 +415,32 @@ final class CloseOverlayWindow: NSWindow {
     }
 
     /// - Parameter delta: degrees the lid has closed since the effect started.
-    func apply(delta: Double, tilt: Double, blur: Double, dim: Double) {
+    /// - Parameter direction: -1 (left) ... 0 (straight back) ... +1 (right).
+    func apply(delta: Double, tilt: Double, direction: Double, blur: Double, dim: Double) {
         let degrees = min(75, delta * tilt)
         let blurProgress = min(1, delta / 45)
         let smooth = blurProgress * blurProgress * (3 - 2 * blurProgress)
 
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        imageLayer.transform = CATransform3DMakeRotation(-degrees * .pi / 180, 1, 0, 0)
+        let d = min(1, max(-1, direction))
+        let radians = degrees * .pi / 180
+
+        // Pivot: bottom-centre for a straight fall, moving to the bottom-left
+        // corner (falls right) or bottom-right corner (falls left).
+        let bounds = imageLayer.bounds
+        let anchorX = 0.5 - 0.5 * d
+        imageLayer.anchorPoint = CGPoint(x: anchorX, y: 0)
+        imageLayer.position = CGPoint(x: bounds.width * anchorX, y: 0)
+
+        // Straight part: top edge tips away around the bottom hinge.
+        let back = CATransform3DMakeRotation(-radians * (1 - abs(d)), 1, 0, 0)
+        // Sideways part: far edge swings away around the vertical pivot edge…
+        let side = CATransform3DMakeRotation(radians * d, 0, 1, 0)
+        // …with a slight roll so it looks like it is toppling over.
+        let roll = CATransform3DMakeRotation(-radians * d * 0.25, 0, 0, 1)
+
+        imageLayer.transform = CATransform3DConcat(CATransform3DConcat(back, side), roll)
         imageLayer.setValue(blur * smooth, forKeyPath: "filters.blur.inputRadius")
         dimLayer.opacity = Float(dim * min(1, delta / 90))
         CATransaction.commit()
